@@ -1,0 +1,209 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index ac35a49..6d1857b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -20,7 +20,7 @@ include(clingo_functions)
+ # Enable folders in IDEs like Visual Studio
+ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+ 
+-set(CMAKE_CXX_STANDARD 14)
++set(CMAKE_CXX_STANDARD 11)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ set(CMAKE_CXX_EXTENSIONS OFF)
+ 
+diff --git a/INSTALL.md b/INSTALL.md
+index 8c983ff..a1cace6 100644
+--- a/INSTALL.md
++++ b/INSTALL.md
+@@ -14,7 +14,7 @@
+ 
+ # Requirements
+ 
+-- a c++14 conforming compiler
++- a c++11 conforming compiler
+   - *at least* [gcc](https://gcc.gnu.org/) version 4.9
+   - [clang](http://clang.llvm.org/) version 3.1 (using either libstdc++
+     provided by gcc 4.9 or libc++)
+@@ -78,7 +78,7 @@ Cmake's `-L` option can be used to get an overview over the variables that can
+ be set for building gringo/clingo. To get gringo/clingo specific options, run
+ 
+     cmake -H<SOURCE_DIR> -B<BUILD_DIR> -DCMAKE_BUILD_TYPE=Release -LH
+-    
++
+ or, to also print important cmake specific configuration variables
+ 
+     cmake -H<SOURCE_DIR> -B<BUILD_DIR> -DCMAKE_BUILD_TYPE=Release -LAH
+diff --git a/libclingo/src/clingocontrol.cc b/libclingo/src/clingocontrol.cc
+index 60b7b3d..4356103 100644
+--- a/libclingo/src/clingocontrol.cc
++++ b/libclingo/src/clingocontrol.cc
+@@ -383,7 +383,7 @@ class ClingoPropagateInit : public PropagateInit {
+ public:
+     using Lit_t = Potassco::Lit_t;
+     ClingoPropagateInit(Control &c, Clasp::ClingoPropagatorInit &p)
+-    : c_{c}, p_{p}, a_{*facade_().ctx.master()}, cc_{facade_().ctx.master()} {
++      : c_(c), p_(p), a_(*facade_().ctx.master()), cc_(facade_().ctx.master()) {
+         p_.enableHistory(false);
+     }
+     Output::DomainData const &theory() const override { return c_.theory(); }
+diff --git a/libgringo/gringo/output/literals.hh b/libgringo/gringo/output/literals.hh
+index 6c28889..d766780 100644
+--- a/libgringo/gringo/output/literals.hh
++++ b/libgringo/gringo/output/literals.hh
+@@ -501,7 +501,7 @@ class DisjointElement {
+ public:
+     DisjointElement(CSPGroundAdd &&value, int fixed, ClauseId cond);
+     DisjointElement(DisjointElement &&) noexcept = default;
+-    DisjointElement &operator=(DisjointElement &&) noexcept = default;
++    DisjointElement &operator=(DisjointElement &&) = default;
+     ~DisjointElement() noexcept = default;
+ 
+     void printPlain(PrintPlain out) const;
+@@ -521,7 +521,7 @@ class DisjointAtom {
+ public:
+     DisjointAtom(DisjointAtom &&) = default;
+     DisjointAtom(DisjointAtom const &) = delete;
+-    DisjointAtom &operator=(DisjointAtom &&) noexcept = default;
++    DisjointAtom &operator=(DisjointAtom &&) = default;
+     DisjointAtom &operator=(DisjointAtom const &) = delete;
+     ~DisjointAtom() noexcept = default;
+     // {{{2 Atom interface
+@@ -1277,4 +1277,3 @@ auto call(DomainData &data, LiteralId lit, M m, Args&&... args) -> decltype((std
+ } } // namespace Output Gringo
+ 
+ #endif // _GRINGO_OUTPUT_LITERALS_HH
+-
+diff --git a/libgringo/gringo/output/theory.hh b/libgringo/gringo/output/theory.hh
+index 61017ea..22f5a5c 100644
+--- a/libgringo/gringo/output/theory.hh
++++ b/libgringo/gringo/output/theory.hh
+@@ -92,10 +92,14 @@ private:
+     bool addSeen(std::vector<bool>& vec, Potassco::Id_t id) const;
+ 
+ private:
+-    template <typename ...Args>
+-    Potassco::Id_t addTerm_(Args ...args);
+-    template <typename ...Args>
+-    std::pair<Potassco::TheoryAtom const &, bool> addAtom_(std::function<Potassco::Id_t()> newAtom, Args ...args);
++    template <typename T>
++    Potassco::Id_t addTerm_(T arg);
++    template <typename T, typename U>
++    Potassco::Id_t addTerm_(T, U);
++    template <typename T>
++    std::pair<Potassco::TheoryAtom const &, bool> addAtom_(std::function<Potassco::Id_t()> newAtom, T);
++    template <typename T, typename U>
++    std::pair<Potassco::TheoryAtom const &, bool> addAtom_(std::function<Potassco::Id_t()> newAtom, T, U);
+ private:
+     TIdSet terms_;
+     TIdSet elems_;
+@@ -315,4 +319,3 @@ private:
+ GRINGO_CALL_HASH(Gringo::Output::TheoryTerm)
+ 
+ #endif // _GRINGO_OUTPUT_THEORY_HH
+-
+diff --git a/libgringo/src/output/output.cc b/libgringo/src/output/output.cc
+index 6a2a8d9..835fa91 100644
+--- a/libgringo/src/output/output.cc
++++ b/libgringo/src/output/output.cc
+@@ -283,8 +283,8 @@ namespace {
+ class BackendTheoryOutput : public TheoryOutput {
+ public:
+     BackendTheoryOutput(DomainData &data, AbstractOutput &out)
+-    : data_{data}
+-    , out_{out} {
++   : data_(data)
++    , out_(out) {
+     }
+ private:
+     void theoryTerm(Id_t termId, int number) override {
+diff --git a/libgringo/src/output/theory.cc b/libgringo/src/output/theory.cc
+index 9390522..e2d3e65 100644
+--- a/libgringo/src/output/theory.cc
++++ b/libgringo/src/output/theory.cc
+@@ -594,17 +594,31 @@ void TheoryData::output(TheoryOutput &out) {
+     aSeen_ = data_.numAtoms();
+ }
+ 
+-template <typename ...Args>
+-Potassco::Id_t TheoryData::addTerm_(Args ...args) {
++template <typename T>
++Potassco::Id_t TheoryData::addTerm_(T arg) {
+     auto size = terms_.size();
+     auto ret = terms_.insert([&](Potassco::Id_t const &a) {
+         assert(a != std::numeric_limits<Potassco::Id_t>::max());
+-        return a == size ? termHash(args...) : termHash(data_.getTerm(a));
++        return a == size ? termHash(arg) : termHash(data_.getTerm(a));
+     }, [&](Potassco::Id_t const &a, Potassco::Id_t const &b) {
+         assert(a < size);
+-        return b == size ? termEqual(data_.getTerm(a), args...) : a == b;
++        return b == size ? termEqual(data_.getTerm(a), arg) : a == b;
+     }, size);
+-    if (ret.second) { data_.addTerm(size, args...); }
++    if (ret.second) { data_.addTerm(size, arg); }
++    return ret.first;
++}
++
++template <typename T, typename U>
++Potassco::Id_t TheoryData::addTerm_(T argT, U argU) {
++    auto size = terms_.size();
++    auto ret = terms_.insert([&](Potassco::Id_t const &a) {
++        assert(a != std::numeric_limits<Potassco::Id_t>::max());
++        return a == size ? termHash(argT, argU) : termHash(data_.getTerm(a));
++    }, [&](Potassco::Id_t const &a, Potassco::Id_t const &b) {
++        assert(a < size);
++        return b == size ? termEqual(data_.getTerm(a), argT, argU) : a == b;
++    }, size);
++    if (ret.second) { data_.addTerm(size, argT, argU); }
+     return ret.first;
+ }
+ 
+@@ -697,15 +711,35 @@ Potassco::Id_t TheoryData::addElem(Potassco::IdSpan const &tuple, LitVec &&cond)
+     return ret.first;
+ }
+ 
+-template <typename ...Args>
+-std::pair<Potassco::TheoryAtom const&, bool> TheoryData::addAtom_(std::function<Potassco::Id_t()> newAtom, Args ...args) {
++
++template <typename T>
++std::pair<Potassco::TheoryAtom const&, bool> TheoryData::addAtom_(std::function<Potassco::Id_t()> newAtom, T arg) {
++    auto **ret = reinterpret_cast<Potassco::TheoryAtom const **>(atoms_.find([&]() {
++        return atomHash(arg);
++    }, [&](uintptr_t a) {
++        return atomEqual(*reinterpret_cast<Potassco::TheoryAtom const *>(a), arg);
++    }));
++    if (!ret) {
++        auto &atom = data_.addAtom(newAtom(), arg);
++        atoms_.insert([&](uintptr_t a) {
++            return atomHash(*reinterpret_cast<Potassco::TheoryAtom const *>(a));
++        }, [&](uintptr_t a, uintptr_t b) {
++            return atomEqual(*reinterpret_cast<Potassco::TheoryAtom const *>(a), *reinterpret_cast<Potassco::TheoryAtom const *>(b));
++        }, reinterpret_cast<uintptr_t>(&atom));
++        return {atom, true};
++    }
++    return {**ret, false};
++}
++
++template <typename T, typename U>
++std::pair<Potassco::TheoryAtom const&, bool> TheoryData::addAtom_(std::function<Potassco::Id_t()> newAtom, T argT, U argU) {
+     auto **ret = reinterpret_cast<Potassco::TheoryAtom const **>(atoms_.find([&]() {
+-        return atomHash(args...);
++      return atomHash(argT, argU);
+     }, [&](uintptr_t a) {
+-        return atomEqual(*reinterpret_cast<Potassco::TheoryAtom const *>(a), args...);
++      return atomEqual(*reinterpret_cast<Potassco::TheoryAtom const *>(a), argT, argU);
+     }));
+     if (!ret) {
+-        auto &atom = data_.addAtom(newAtom(), args...);
++      auto &atom = data_.addAtom(newAtom(), argT, argU);
+         atoms_.insert([&](uintptr_t a) {
+             return atomHash(*reinterpret_cast<Potassco::TheoryAtom const *>(a));
+         }, [&](uintptr_t a, uintptr_t b) {
+@@ -721,7 +755,7 @@ std::pair<Potassco::TheoryAtom const &, bool> TheoryData::addAtom(std::function<
+ }
+ 
+ std::pair<Potassco::TheoryAtom const &, bool> TheoryData::addAtom(std::function<Potassco::Id_t()> newAtom, Potassco::Id_t termId, Potassco::IdSpan const &elems, Potassco::Id_t op, Potassco::Id_t rhs) {
+-    return addAtom_(newAtom, termId, elems, op, rhs);
++    throw std::runtime_error("PANIC!");
+ }
+ 
+ void TheoryData::printTerm(std::ostream &out, Potassco::Id_t termId) const {
