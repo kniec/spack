@@ -1,4 +1,4 @@
-FROM public.ecr.aws/amazonlinux/amazonlinux:2.0.20201111.0
+FROM public.ecr.aws/amazonlinux/amazonlinux:2.0.20210126.0
 MAINTAINER Spack Maintainers <maintainers@spack.io>
 
 ENV DOCKERFILE_BASE=centos            \
