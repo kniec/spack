@@ -1,4 +1,4 @@
-FROM public.ecr.aws/amazonlinux/amazonlinux:2.0.20210126.0
+FROM public.ecr.aws/amazonlinux/amazonlinux:2.0.20210326.0
 MAINTAINER Spack Maintainers <maintainers@spack.io>
 
 ENV DOCKERFILE_BASE=centos            \
@@ -64,7 +64,16 @@ WORKDIR /root
 SHELL ["docker-shell"]
 
 # TODO: add a command to Spack that (re)creates the package cache
-RUN spack spec hdf5+mpi
+RUN spack install gcc@8.4.0 
+ && spack compiler find `spack location -i gcc@8.4.0` \
+ && spack config add "packages:all:compiler:[gcc@8.4.0]"
+RUN spack install gcc@9.3.0 \
+ && spack compiler find `spack location -i gcc@9.3.0` \
+ && spack config add "packages:all:compiler:[gcc@9.3.0]"
+RUN spack install gcc@10.2.0 \
+ && spack compiler find `spack location -i gcc@10.2.0` \
+ && spack config add "packages:all:compiler:[gcc@10.2.0]"
+
 
 ENTRYPOINT ["/bin/bash", "/opt/spack/share/spack/docker/entrypoint.bash"]
 CMD ["interactive-shell"]
